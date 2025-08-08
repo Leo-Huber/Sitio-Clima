@@ -4,8 +4,8 @@ Incluye un backend Node.js con Express que actúa como proxy, evitando exponer l
 
 ## Configuración inicial
 Clonar o descargar el proyecto
-git clone https://github.com/Leo-Huber/Sitio-Clima.git
-cd sitio-clima
+- git clone https://github.com/Leo-Huber/Sitio-Clima.git
+- cd sitio-clima
 
 ## Instalar dependencias
 npm install
@@ -21,14 +21,14 @@ Copia tu clave
 ## Configurar variables de entorno
 
 Crea un archivo .env en la raíz con:
-API_KEY_OPENWEATHER=TU_API_KEY_AQUI
-PORT=3000
+- API_KEY_OPENWEATHER=TU_API_KEY_AQUI
+- PORT=3000
 
 (Asegúrate de que .env está en el .gitignore para no subirlo a repositorios públicos.)
 
 ## Ejecución
 Inicia el servidor con:
-npm start
+- npm start
 
 Esto hace lo siguiente:
 - Levanta el servidor Node.js en http://localhost:3000
