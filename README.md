@@ -2,20 +2,9 @@
 Aplicación web para consultar el clima actual, el pronóstico por hora (próximas 24 h) y los próximos días, usando la API de OpenWeatherMap.
 Incluye un backend Node.js con Express que actúa como proxy, evitando exponer la clave API en el frontend.
 
-## Estructura del proyecto
-/
-├── index.html        # Interfaz principal
-├── style.css         # Estilos del sitio
-├── script.js         # Lógica frontend, consume el backend
-├── server.js         # Servidor Express (proxy API)
-├── .env              # Variables de entorno (API Key, puerto)
-├── package.json
-├── package-lock.json
-└── .gitignore
-
 ## Configuración inicial
 Clonar o descargar el proyecto
-git clone https://tu-repo.git
+git clone https://github.com/Leo-Huber/Sitio-Clima.git
 cd sitio-clima
 
 ## Instalar dependencias
