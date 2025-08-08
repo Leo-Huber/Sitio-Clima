@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mi Clima</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+  <header class="topbar">
+    <h1 class="brand">Mi Clima</h1>
+    <form id="buscador" class="search">
+      <input id="ciudadEntrada" type="text" placeholder="Buscar ciudad (ej: Asunción)" autocomplete="off"/>
+      <button id="botonBusqueda" type="submit">Buscar</button>
+    </form>
+  </header>
+
+  <main class="container">
+    <section class="quick-cities">
+      <button class="pill" data-city="Asunción">Asunción</button>
+      <button class="pill" data-city="Ciudad del Este">Ciudad del Este</button>
+      <button class="pill" data-city="Encarnación">Encarnación</button>
+      <button class="pill" data-city="Buenos Aires">Buenos Aires</button>
+      <button class="pill" data-city="São Paulo">São Paulo</button>
+      <button class="pill" data-city="Madrid">Madrid</button>
+    </section>
+
+    <section id="panelActual" class="card current">
+      <div id="datosClima" class="current__content">
+        <!-- Clima actual se inyecta aquí -->
+      </div>
+    </section>
+
+    <section class="card hourly">
+      <h2>Por hora (próximas 24 h)</h2>
+      <div id="listaHoraria" class="hourly__list">
+        <!-- Timeline por hora -->
+      </div>
+    </section>
+
+    <section class="card daily">
+      <h2>Próximos días</h2>
+      <div id="listaDiaria" class="daily__grid">
+        <!-- Pronóstico por días -->
+      </div>
+    </section>
+
+    <p id="estado" class="status" aria-live="polite"></p>
+  </main>
+
+  <footer class="footer">
+    <small>Datos por OpenWeatherMap</small>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
