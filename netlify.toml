@@ -4,22 +4,28 @@
 
 [functions]
   directory = "netlify/functions"
-  node_bundler = "esbuild" 
+  node_bundler = "esbuild"
 
+# /api/weather -> Function weather
 [[redirects]]
   from = "/api/weather"
   to = "/.netlify/functions/weather"
   status = 200
 
-  from = "/api/log-rain"
-  to = "/.netlify/functions/log-rain"
-  status = 200
-
+# /api/forecast -> Function forecast
 [[redirects]]
   from = "/api/forecast"
   to = "/.netlify/functions/forecast"
   status = 200
 
-  from = "/api/logs.csv"
+# /api/log-rain -> Function log-rain
+[[redirects]]
+  from = "/api/log-rain"
+  to = "/.netlify/functions/log-rain"
+  status = 200
+
+# /api/logs-csv.csv -> Function logs-csv (devuelve CSV)
+[[redirects]]
+  from = "/api/logs-csv.csv"
   to = "/.netlify/functions/logs-csv"
   status = 200
