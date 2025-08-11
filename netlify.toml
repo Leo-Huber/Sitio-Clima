@@ -11,7 +11,15 @@
   to = "/.netlify/functions/weather"
   status = 200
 
+  from = "/api/log-rain"
+  to = "/.netlify/functions/log-rain"
+  status = 200
+
 [[redirects]]
   from = "/api/forecast"
   to = "/.netlify/functions/forecast"
+  status = 200
+
+  from = "/api/logs.csv"
+  to = "/.netlify/functions/logs-csv"
   status = 200
