@@ -1,32 +1,59 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Clima Local</title>
-  <link rel="stylesheet" href="./style.css" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Mi Clima</title>
+  <meta name="description" content="Clima actual, pronóstico por hora y próximos días."/>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⛅</text></svg>">
+  <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
+  <header class="topbar">
+    <h1 class="brand">Mi Clima</h1>
+    <form id="buscador" class="search" autocomplete="off">
+      <input id="ciudadEntrada" type="text" placeholder="Buscar ciudad (ej: Asunción)"/>
+      <button id="botonBusqueda" type="submit">Buscar</button>
+    </form>
+  </header>
+
   <main class="container">
-    <h1>Clima Local</h1>
+    <section class="quick-cities">
+      <button class="pill" data-city="Asunción">Asunción</button>
+      <button class="pill" data-city="Ciudad del Este">Ciudad del Este</button>
+      <button class="pill" data-city="Encarnación">Encarnación</button>
+      <button class="pill" data-city="Buenos Aires">Buenos Aires</button>
+      <button class="pill" data-city="São Paulo">São Paulo</button>
+      <button class="pill" data-city="Madrid">Madrid</button>
 
-    <section id="busqueda">
-      <label for="city">Ciudad</label>
-      <input id="city" placeholder="Asunción" value="Asunción" />
-      <button id="btnWeather">Ver clima</button>
-      <button id="btnForecast">Pronóstico</button>
+      <span class="spacer"></span>
+
+      <!-- Acciones de logging/export -->
+      <button id="btnLogAsu" class="pill" title="Registrar lluvia en Asunción (07–17)">Registrar lluvia</button>
+      <button id="btnExportCSV" class="pill pill-accent" title="Descargar logs CSV">Exportar CSV</button>
     </section>
 
-    <section id="resultado">
-      <pre id="out"></pre>
+    <section id="panelActual" class="card current" aria-live="polite">
+      <div id="datosClima" class="current__content"><!-- renderActual() --></div>
     </section>
 
-    <section id="acciones">
-      <button id="btnExport">Exportar CSV</button>
-      <small id="hint">El registro de lluvia se guarda automáticamente entre 07:00–17:00 para Asunción.</small>
+    <section class="card hourly">
+      <h2>Por hora (próximas 24 h)</h2>
+      <div id="listaHoraria" class="hourly__list" role="list"><!-- renderHoraria() --></div>
     </section>
+
+    <section class="card daily">
+      <h2>Próximos días</h2>
+      <div id="listaDiaria" class="daily__grid" role="list"><!-- renderDiaria() --></div>
+    </section>
+
+    <p id="estado" class="status" aria-live="polite"></p>
   </main>
 
-  <script src="./script.js" defer></script>
+  <footer class="footer">
+    <small>Datos por OpenWeatherMap • Backend serverless en Netlify</small>
+  </footer>
+
+  <script src="script.js" defer></script>
 </body>
 </html>
