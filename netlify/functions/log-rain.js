@@ -1,90 +1,44 @@
-import { getStore } from '@netlify/blobs';
+const { getStore } = require('@netlify/blobs');
 
-export async function handler(event) {
+// Guarda registros de lluvia solo para Asunción de 07:00 a 17:00
+exports.handler = async (event) => {
   try {
-    const url = new URL(event.rawUrl);
-    const city = (url.searchParams.get('city') || 'Asunción').trim();
-
-    const api = new URL('https://api.openweathermap.org/data/2.5/forecast');
-    api.searchParams.set('q', city);
-    api.searchParams.set('appid', process.env.API_KEY_OPENWEATHER);
-    api.searchParams.set('units', 'metric');
-    api.searchParams.set('lang', 'es');
-
-    const r = await fetch(api);
-    const forecast = await r.json();
-    if (!r.ok) return json(r.status, { error: forecast?.message || 'Error consultando forecast' });
-
-    const tz = forecast?.city?.timezone || 0;
-    const cityName = forecast?.city?.name || city;
-    const country = forecast?.city?.country || 'PY';
-
-    const rainyBlocks = (forecast.list || []).filter((i) => {
-      const hasRain = (i.rain && ((i.rain['3h'] || i.rain['1h'] || 0) > 0)) ||
-                      (i.weather && i.weather[0] && isRainCode(i.weather[0].id));
-      if (!hasRain) return false;
-      const local = new Date((i.dt + tz) * 1000);
-      const hour = local.getUTCHours();
-      return hour >= 7 && hour <= 17;
-    });
-
-    const daysMap = new Map();
-    rainyBlocks.forEach((i) => {
-      const local = new Date((i.dt + tz) * 1000);
-      const key = yyyy_mm_dd(local);
-      const temp = i?.main?.temp;
-      const vol  = i?.rain?.['3h'] || i?.rain?.['1h'] || 0;
-      const desc = i?.weather?.[0]?.description || 'lluvia';
-      const icon = i?.weather?.[0]?.icon || '10d';
-
-      if (!daysMap.has(key)) {
-        daysMap.set(key, {
-          date: key,
-          city: cityName,
-          country,
-          timezone: tz,
-          anyHourBetween_07_17: true,
-          minTemp: temp,
-          maxTemp: temp,
-          totalRainMm_approx: vol,
-          samples: 1,
-          sampleDesc: desc,
-          sampleIcon: icon
-        });
-      } else {
-        const d = daysMap.get(key);
-        if (typeof temp === 'number') {
-          d.minTemp = Math.min(d.minTemp ?? temp, temp);
-          d.maxTemp = Math.max(d.maxTemp ?? temp, temp);
-        }
-        d.totalRainMm_approx += vol || 0;
-        d.samples += 1;
-      }
-    });
-
-    const store = getStore({ name: 'rain-logs', consistency: 'eventual' });
-    const currentRaw = (await store.get('rain-logs.json')) || '[]';
-    let current = [];
-    try { current = JSON.parse(currentRaw) || []; } catch { current = []; }
-
-    const newEntries = Array.from(daysMap.values()).filter((entry) =>
-      !current.some(e => e.date === entry.date && e.city === entry.city)
-    );
-
-    if (newEntries.length > 0) {
-      const updated = [...current, ...newEntries];
-      await store.set('rain-logs.json', JSON.stringify(updated, null, 2), {
-        metadata: { contentType: 'application/json' }
-      });
+    if (event.httpMethod !== 'POST') {
+      return { statusCode: 405, body: 'Method Not Allowed' };
     }
 
-    return json(200, { ok: true, added: newEntries.length });
-  } catch (err) {
-    console.error('log-rain error:', err);
-    return json(500, { error: 'Error interno registrando lluvia' });
-  }
-}
+    const payload = JSON.parse(event.body || '{}');
+    const { city, localTimeISO, mm, description } = payload;
 
-function isRainCode(id) { return (id >= 200 && id <= 232) || (id >= 300 && id <= 321) || (id >= 500 && id <= 531); }
-function yyyy_mm_dd(d) { const y=d.getUTCFullYear(), m=String(d.getUTCMonth()+1).padStart(2,'0'), day=String(d.getUTCDate()).padStart(2,'0'); return `${y}-${m}-${day}`; }
-function json(statusCode, body){ return { statusCode, headers:{'content-type':'application/json; charset=utf-8'}, body: JSON.stringify(body) }; }
+    // Normaliza ciudad (acentos y case)
+    const isAsuncion = (city || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase() === 'asuncion';
+    if (!isAsuncion) {
+      return { statusCode: 200, body: JSON.stringify({ ok: true, skipped: 'city' }) };
+    }
+
+    // Ventana 07:00–17:00 (hora local que envías desde el front)
+    const dt = new Date(localTimeISO);
+    const hour = dt.getHours();
+    if (hour < 7 || hour >= 17) {
+      return { statusCode: 200, body: JSON.stringify({ ok: true, skipped: 'time' }) };
+    }
+
+    const store = getStore('rain-logs');                 // “bucket” lógico
+    const key = 'asuncion.json';                         // una sola clave
+    const current = (await store.get(key, { type: 'json' })) || [];
+
+    current.push({
+      ts: new Date().toISOString(),                     // sello servidor
+      localTimeISO,
+      mm: Number(mm) || 0,
+      description: description || '',
+    });
+
+    await store.set(key, JSON.stringify(current), { metadata: { updatedBy: 'log-rain' } });
+
+    return { statusCode: 200, body: JSON.stringify({ ok: true, count: current.length }) };
+  } catch (err) {
+    console.error('log-rain error', err);
+    return { statusCode: 500, body: 'log-rain failed' };
+  }
+};

@@ -1,73 +1,47 @@
-import { getStore } from '@netlify/blobs';
+const { getStore } = require('@netlify/blobs');
 
-export async function handler() {
+function toCSV(rows) {
+  return rows
+    .map((r) => r.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+}
+
+exports.handler = async () => {
   try {
-    const store = getStore({ name: 'rain-logs', consistency: 'eventual' });
+    const store = getStore('rain-logs');
+    const key = 'asuncion.json';
+    const logs = (await store.get(key, { type: 'json' })) || [];
 
-    // Si no existe, devolvemos CSV vacío (con headers)
-    const raw = (await store.get('rain-logs.json')) || '[]';
-
-    let data;
-    try {
-      data = JSON.parse(raw);
-      if (!Array.isArray(data)) data = [];
-    } catch {
-      // Si hay corrupción de formato, no rompemos: devolvemos vacío
-      data = [];
-    }
-
-    const headers = [
-      'date',
-      'city',
-      'country',
-      'timezone',
-      'anyHourBetween_07_17',
-      'minTemp',
-      'maxTemp',
-      'totalRainMm_approx',
-      'samples'
-    ];
-
-    const rows = data.map((r) => [
-      safe(r?.date),
-      safe(r?.city),
-      safe(r?.country),
-      num(r?.timezone),
-      r?.anyHourBetween_07_17 ? 'true' : 'false',
-      num(r?.minTemp),
-      num(r?.maxTemp),
-      num(r?.totalRainMm_approx),
-      num(r?.samples)
+    const header = ['fecha_servidor', 'hora_local', 'mm', 'descripcion'];
+    const rows = logs.map((it) => [
+      it.ts || '',
+      it.localTimeISO || '',
+      it.mm ?? '',
+      it.description ?? '',
     ]);
 
-    const csv = toCSV([headers, ...rows]);
+    const csv = '\uFEFF' + toCSV([header, ...rows]); // BOM para Excel
 
     return {
       statusCode: 200,
       headers: {
-        'content-type': 'text/csv; charset=utf-8',
-        'content-disposition': 'attachment; filename="rain-logs.csv"'
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="asuncion-lluvia.csv"',
+        'Cache-Control': 'no-store',
       },
-      body: csv
+      body: csv,
     };
   } catch (err) {
-    // Log interno para ver en Netlify → Functions → Logs
-    console.error('logs-csv error:', err);
-    return { statusCode: 500, body: 'Error generando CSV' };
+    console.error('logs-csv error', err);
+    // Devuelve CSV mínimo aunque falle (evita 500 en el navegador)
+    const csv = '\uFEFF' + toCSV([['fecha_servidor', 'hora_local', 'mm', 'descripcion']]);
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="asuncion-lluvia.csv"',
+      },
+      body: csv,
+    };
   }
-}
-
-function toCSV(matrix) {
-  const bom = '\uFEFF'; // para Excel
-  const lines = matrix.map(cols =>
-    cols.map(c => {
-      const s = String(c ?? '');
-      const needsQuotes = /[",\n]/.test(s);
-      const escaped = s.replace(/"/g, '""');
-      return needsQuotes ? `"${escaped}"` : escaped;
-    }).join(',')
-  );
-  return bom + lines.join('\n');
-}
-const safe = (v) => (v == null ? '' : String(v));
-const num  = (v) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v * 10) / 10 : '');
+};

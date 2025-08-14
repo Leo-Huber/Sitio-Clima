@@ -1,31 +1,16 @@
 [build]
   publish = "."
-  command = ""
+  functions = "netlify/functions"
 
-[functions]
-  directory = "netlify/functions"
-  node_bundler = "esbuild"
-
-# /api/weather -> Function weather
 [[redirects]]
-  from = "/api/weather"
-  to = "/.netlify/functions/weather"
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
   status = 200
+  force = true
 
-# /api/forecast -> Function forecast
+# ruta “amigable” para el botón Exportar
 [[redirects]]
-  from = "/api/forecast"
-  to = "/.netlify/functions/forecast"
-  status = 200
-
-# /api/log-rain -> Function log-rain
-[[redirects]]
-  from = "/api/log-rain"
-  to = "/.netlify/functions/log-rain"
-  status = 200
-
-# /api/logs-csv.csv -> Function logs-csv (devuelve CSV)
-[[redirects]]
-  from = "/api/logs-csv.csv"
+  from = "/logs-csv.csv"
   to = "/.netlify/functions/logs-csv"
   status = 200
+  force = true

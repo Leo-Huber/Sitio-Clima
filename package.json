@@ -12,6 +12,7 @@
     "netlify-cli": "^17.0.0"
   },
   "dependencies": {
+    "@netlify/functions": "^2.5.1",
     "@netlify/blobs": "^10.0.8"
   }
 }
