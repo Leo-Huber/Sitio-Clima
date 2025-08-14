@@ -2,11 +2,9 @@ import { getStore } from '@netlify/blobs';
 
 export async function handler(event) {
   try {
-    // ciudad fija por requerimiento (Asunción, PY); permite override con ?city=
     const url = new URL(event.rawUrl);
     const city = (url.searchParams.get('city') || 'Asunción').trim();
 
-    // 1) Traer pronóstico 5 días / 3h (métrico, es)
     const api = new URL('https://api.openweathermap.org/data/2.5/forecast');
     api.searchParams.set('q', city);
     api.searchParams.set('appid', process.env.API_KEY_OPENWEATHER);
@@ -15,45 +13,37 @@ export async function handler(event) {
 
     const r = await fetch(api);
     const forecast = await r.json();
-    if (!r.ok) {
-      return json(r.status, { error: forecast?.message || 'Error consultando forecast' });
-    }
+    if (!r.ok) return json(r.status, { error: forecast?.message || 'Error consultando forecast' });
 
-    const tz = forecast?.city?.timezone || 0; // offset en segundos vs UTC
-    const items = forecast.list || [];
+    const tz = forecast?.city?.timezone || 0;
+    const cityName = forecast?.city?.name || city;
+    const country = forecast?.city?.country || 'PY';
 
-    // 2) Filtrar bloques con lluvia entre 07:00–17:00 (hora local de la ciudad)
-    const rainyBlocks = items.filter((i) => {
-      const hasRain =
-        (i.rain && (i.rain['3h'] || i.rain['1h'] || 0) > 0) ||
-        (i.weather && i.weather[0] && isRainCode(i.weather[0].id));
-
+    const rainyBlocks = (forecast.list || []).filter((i) => {
+      const hasRain = (i.rain && ((i.rain['3h'] || i.rain['1h'] || 0) > 0)) ||
+                      (i.weather && i.weather[0] && isRainCode(i.weather[0].id));
       if (!hasRain) return false;
-
-      // convertir dt (UTC seg) a hora local de la ciudad
       const local = new Date((i.dt + tz) * 1000);
-      const hour = local.getUTCHours(); // ya ajustado por tz
+      const hour = local.getUTCHours();
       return hour >= 7 && hour <= 17;
     });
 
-    // 3) Reducir a "días" con lluvia en esa franja (sin duplicar la misma fecha)
     const daysMap = new Map();
     rainyBlocks.forEach((i) => {
       const local = new Date((i.dt + tz) * 1000);
-      const key = yyyy_mm_dd(local); // fecha local de la ciudad
-      const vol = (i.rain?.['3h'] || i.rain?.['1h'] || 0);
-      const desc = i.weather?.[0]?.description || 'lluvia';
-      const icon = i.weather?.[0]?.icon || '10d';
-      const temp = i.main?.temp;
+      const key = yyyy_mm_dd(local);
+      const temp = i?.main?.temp;
+      const vol  = i?.rain?.['3h'] || i?.rain?.['1h'] || 0;
+      const desc = i?.weather?.[0]?.description || 'lluvia';
+      const icon = i?.weather?.[0]?.icon || '10d';
 
       if (!daysMap.has(key)) {
         daysMap.set(key, {
           date: key,
-          city: forecast.city?.name || city,
-          country: forecast.city?.country || 'PY',
+          city: cityName,
+          country,
           timezone: tz,
           anyHourBetween_07_17: true,
-          // acumulamos un mínimo de info útil:
           minTemp: temp,
           maxTemp: temp,
           totalRainMm_approx: vol,
@@ -62,28 +52,24 @@ export async function handler(event) {
           sampleIcon: icon
         });
       } else {
-        const ref = daysMap.get(key);
-        ref.minTemp = Math.min(ref.minTemp, temp);
-        ref.maxTemp = Math.max(ref.maxTemp, temp);
-        ref.totalRainMm_approx += vol;
-        ref.samples += 1;
+        const d = daysMap.get(key);
+        if (typeof temp === 'number') {
+          d.minTemp = Math.min(d.minTemp ?? temp, temp);
+          d.maxTemp = Math.max(d.maxTemp ?? temp, temp);
+        }
+        d.totalRainMm_approx += vol || 0;
+        d.samples += 1;
       }
     });
 
-    if (daysMap.size === 0) {
-      return json(200, { ok: true, logAdded: false, message: 'No hubo lluvia entre 07–17 en el rango consultado.' });
-    }
-
-    // 4) Guardar (append) en Netlify Blobs
-    const store = getStore({ name: 'rain-logs', consistency: 'eventual' }); // nombre lógico del bucket
-    // Leer existente
+    const store = getStore({ name: 'rain-logs', consistency: 'eventual' });
     const currentRaw = (await store.get('rain-logs.json')) || '[]';
-    const current = JSON.parse(currentRaw);
+    let current = [];
+    try { current = JSON.parse(currentRaw) || []; } catch { current = []; }
 
-    // Evitar duplicados por fecha+ciudad
-    const newEntries = Array.from(daysMap.values()).filter((entry) => {
-      return !current.some(e => e.date === entry.date && e.city === entry.city);
-    });
+    const newEntries = Array.from(daysMap.values()).filter((entry) =>
+      !current.some(e => e.date === entry.date && e.city === entry.city)
+    );
 
     if (newEntries.length > 0) {
       const updated = [...current, ...newEntries];
@@ -92,27 +78,13 @@ export async function handler(event) {
       });
     }
 
-    return json(200, { ok: true, logAdded: newEntries.length > 0, added: newEntries.length });
+    return json(200, { ok: true, added: newEntries.length });
   } catch (err) {
-    console.error(err);
+    console.error('log-rain error:', err);
     return json(500, { error: 'Error interno registrando lluvia' });
   }
 }
 
-function isRainCode(id) {
-  // 2xx tormentas, 3xx llovizna, 5xx lluvia
-  return (id >= 200 && id <= 232) || (id >= 300 && id <= 321) || (id >= 500 && id <= 531);
-}
-function yyyy_mm_dd(d) {
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(d.getUTCDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-function json(statusCode, body) {
-  return {
-    statusCode,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-    body: JSON.stringify(body)
-  };
-}
+function isRainCode(id) { return (id >= 200 && id <= 232) || (id >= 300 && id <= 321) || (id >= 500 && id <= 531); }
+function yyyy_mm_dd(d) { const y=d.getUTCFullYear(), m=String(d.getUTCMonth()+1).padStart(2,'0'), day=String(d.getUTCDate()).padStart(2,'0'); return `${y}-${m}-${day}`; }
+function json(statusCode, body){ return { statusCode, headers:{'content-type':'application/json; charset=utf-8'}, body: JSON.stringify(body) }; }

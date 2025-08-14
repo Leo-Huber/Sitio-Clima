@@ -3,8 +3,18 @@ import { getStore } from '@netlify/blobs';
 export async function handler() {
   try {
     const store = getStore({ name: 'rain-logs', consistency: 'eventual' });
+
+    // Si no existe, devolvemos CSV vacío (con headers)
     const raw = (await store.get('rain-logs.json')) || '[]';
-    const data = JSON.parse(raw);
+
+    let data;
+    try {
+      data = JSON.parse(raw);
+      if (!Array.isArray(data)) data = [];
+    } catch {
+      // Si hay corrupción de formato, no rompemos: devolvemos vacío
+      data = [];
+    }
 
     const headers = [
       'date',
@@ -19,15 +29,15 @@ export async function handler() {
     ];
 
     const rows = data.map((r) => [
-      r.date,
-      safe(r.city),
-      safe(r.country),
-      r.timezone,
-      r.anyHourBetween_07_17 ? 'true' : 'false',
-      round(r.minTemp),
-      round(r.maxTemp),
-      round(r.totalRainMm_approx),
-      r.samples
+      safe(r?.date),
+      safe(r?.city),
+      safe(r?.country),
+      num(r?.timezone),
+      r?.anyHourBetween_07_17 ? 'true' : 'false',
+      num(r?.minTemp),
+      num(r?.maxTemp),
+      num(r?.totalRainMm_approx),
+      num(r?.samples)
     ]);
 
     const csv = toCSV([headers, ...rows]);
@@ -41,14 +51,14 @@ export async function handler() {
       body: csv
     };
   } catch (err) {
-    console.error(err);
+    // Log interno para ver en Netlify → Functions → Logs
+    console.error('logs-csv error:', err);
     return { statusCode: 500, body: 'Error generando CSV' };
   }
 }
 
 function toCSV(matrix) {
-  // Escapar comillas y separar por coma; agregar BOM para Excel
-  const bom = '\uFEFF';
+  const bom = '\uFEFF'; // para Excel
   const lines = matrix.map(cols =>
     cols.map(c => {
       const s = String(c ?? '');
@@ -60,4 +70,4 @@ function toCSV(matrix) {
   return bom + lines.join('\n');
 }
 const safe = (v) => (v == null ? '' : String(v));
-const round = (v) => (typeof v === 'number' ? Math.round(v * 10) / 10 : '');
+const num  = (v) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v * 10) / 10 : '');
