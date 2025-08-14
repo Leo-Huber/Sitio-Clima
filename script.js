@@ -1,149 +1,93 @@
-// Helpers
+// Utilidad para normalizar nombre de ciudad
+const normalize = (str) =>
+  (str || "").normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+
 const $ = (sel) => document.querySelector(sel);
-const estado = $('#estado');
+const out = $("#out");
 
-function iconUrl(code){ return `https://openweathermap.org/img/wn/${code}@2x.png`; }
-function fmtTemp(v){ return `${Math.round(v)}°C`; }
-function fmtWind(ms){ return `${Math.round(ms*3.6)} km/h`; }
-function titleCase(s){ return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+const print = (data) => {
+  out.textContent = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+};
 
-function toLocal(dt, tzSeconds){ return new Date((dt + tzSeconds) * 1000); }
-function dayKey(date){
-  const y = date.getUTCFullYear();
-  const m = String(date.getUTCMonth()+1).padStart(2,'0');
-  const d = String(date.getUTCDate()).padStart(2,'0');
-  return `${y}-${m}-${d}`;
-}
-function dayName(date){ return date.toLocaleDateString('es-ES', { weekday:'short' }).replace('.',''); }
-function hourStr(date){ return date.toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' }); }
-
-// Render: actual
-function renderActual(data){
-  const { name, sys, main, weather, wind } = data;
-  const w = weather[0];
-  const html = `
-    <div>
-      <h2>${name}, ${sys.country}</h2>
-      <p class="meta">${titleCase(w.description)}</p>
-      <div class="temp">${fmtTemp(main.temp)}</div>
-      <div class="details">
-        <span>Sensación: <strong>${fmtTemp(main.feels_like)}</strong></span>
-        <span>Humedad: <strong>${main.humidity}%</strong></span>
-        <span>Viento: <strong>${fmtWind(wind.speed)}</strong></span>
-        <span>Presión: <strong>${main.pressure} hPa</strong></span>
-      </div>
-    </div>
-    <div class="right">
-      <img alt="${w.description}" width="96" height="96" src="${iconUrl(w.icon)}"/>
-    </div>`;
-  $('#datosClima').innerHTML = html;
+// --- Llama a la función serverless de clima ---
+async function getWeather(city) {
+  const url = `/api/weather?city=${encodeURIComponent(city)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Weather HTTP ${res.status}`);
+  return res.json();
 }
 
-// Render: por hora (24h)
-function renderHoraria(list){
-  const now = Date.now();
-  const prox = list.filter(i => (i.dt*1000) > now).slice(0, 8); // 8 bloques de 3h = 24h
-  $('#listaHoraria').innerHTML = prox.map(i => {
-    const date = new Date(i.dt * 1000); // mostrar en hora local del usuario
-    return `
-      <div class="hour">
-        <div class="time">${hourStr(date)}</div>
-        <img alt="${i.weather[0].description}" width="60" height="60" src="${iconUrl(i.weather[0].icon)}"/>
-        <div class="t">${fmtTemp(i.main.temp)}</div>
-        <div class="desc">${titleCase(i.weather[0].description)}</div>
-      </div>`;
-  }).join('');
+// --- Llama a la función serverless de pronóstico ---
+async function getForecast(city) {
+  const url = `/api/forecast?city=${encodeURIComponent(city)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Forecast HTTP ${res.status}`);
+  return res.json();
 }
 
-// Render: próximos días (min/máx + icono dominante)
-function renderDiaria(list, cityTZ){
-  const grupos = new Map();
-  list.forEach(i => {
-    const local = toLocal(i.dt, cityTZ);
-    const key = dayKey(local);
-    if(!grupos.has(key)) grupos.set(key, []);
-    grupos.get(key).push(i);
-  });
+// --- Envía registro de lluvia (si corresponde) ---
+async function maybeLogRain(city, weatherPayload) {
+  try {
+    // Registra solo si la ciudad es Asunción y es lluvia (en español/inglés)
+    const isAsu = normalize(city) === "asuncion";
+    if (!isAsu) return;
 
-  const dias = Array.from(grupos.entries())
-    .map(([key, items]) => {
-      const temps = items.map(x => x.main.temp);
-      const min = Math.min(...temps);
-      const max = Math.max(...temps);
-      const counts = {};
-      items.forEach(x => { const ic = x.weather[0].icon; counts[ic] = (counts[ic]||0)+1; });
-      const icon = Object.entries(counts).sort((a,b)=>b[1]-a[1])[0][0];
-      const date = new Date(key + 'T00:00:00Z');
-      return { date, min, max, icon, desc: items[0].weather[0].description };
-    })
-    .sort((a,b)=> a.date - b.date)
-    .slice(0,5);
+    const description = (weatherPayload?.description || "").toLowerCase();
+    const mm = Number(weatherPayload?.rain_mm || 0);
 
-  $('#listaDiaria').innerHTML = dias.map(d => `
-    <div class="day">
-      <div class="name">${dayName(d.date)}</div>
-      <img alt="${d.desc}" width="64" height="64" src="${iconUrl(d.icon)}"/>
-      <div class="range">
-        <span>${fmtTemp(d.max)}</span> / <span>${fmtTemp(d.min)}</span>
-      </div>
-      <div class="desc">${titleCase(d.desc)}</div>
-    </div>
-  `).join('');
-}
+    const looksRain =
+      mm > 0 ||
+      /\b(rain|lluvia|chubasco|tormenta|drizzle|aguacero|shower|storm)\b/.test(description);
 
-// Llamadas al backend (sin exponer API key)
-async function buscarCiudad(ciudad){
-  if(!ciudad) return;
-  estado.textContent = 'Buscando…';
-  try{
-    const [wResp, fResp] = await Promise.all([
-      fetch(`/api/weather?city=${encodeURIComponent(ciudad)}`),
-      fetch(`/api/forecast?city=${encodeURIComponent(ciudad)}`)
-    ]);
+    if (!looksRain) return;
 
-    if(!wResp.ok){
-      const err = await wResp.json().catch(()=> ({}));
-      throw new Error(err.message || 'No se encontró la ciudad (clima actual).');
-    }
-    if(!fResp.ok){
-      const err = await fResp.json().catch(()=> ({}));
-      throw new Error(err.message || 'No se encontró la ciudad (pronóstico).');
-    }
-
-    const wData = await wResp.json();
-    const fData = await fResp.json();
-
-    renderActual(wData);
-    renderHoraria(fData.list);
-    renderDiaria(fData.list, fData.city.timezone || 0);
-    estado.textContent = `Actualizado: ${new Date().toLocaleTimeString('es-ES')}`;
-  }catch(err){
-    console.error(err);
-    estado.textContent = err.message || 'Error consultando el clima.';
+    // Hora local que se envía al backend para validar 07:00–17:00 allá
+    const localTimeISO = new Date().toISOString();
+    await fetch("/api/log-rain", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ city, localTimeISO, mm, description }),
+    });
+  } catch {
+    // Silencioso: el registro no debe romper la UI
   }
 }
 
-// Eventos UI
-document.addEventListener('DOMContentLoaded', () => {
-  // Quick cities
-  document.querySelectorAll('.pill[data-city]').forEach(btn => {
-    btn.addEventListener('click', () => buscarCiudad(btn.dataset.city));
-  });
-
-  // Buscar con submit (y Enter)
-  $('#buscador').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const v = $('#ciudadEntrada').value.trim();
-    buscarCiudad(v);
-  });
-
-  // Ciudad por defecto
-  buscarCiudad('Asunción');
+$("#btnWeather").addEventListener("click", async () => {
+  const city = $("#city").value.trim() || "Asunción";
+  print("Cargando clima...");
+  try {
+    const data = await getWeather(city);
+    print(data);
+    await maybeLogRain(city, data);
+  } catch (e) {
+    print(`Error: ${e.message}`);
+  }
 });
 
-// Botón “Buscar” por compatibilidad (opcional porque ya manejamos submit)
-document.getElementById('botonBusqueda').addEventListener('click', (e) => {
-  e.preventDefault();
-  const ciudad = document.getElementById('ciudadEntrada').value.trim();
-  if (ciudad) buscarCiudad(ciudad);
+$("#btnForecast").addEventListener("click", async () => {
+  const city = $("#city").value.trim() || "Asunción";
+  print("Cargando pronóstico...");
+  try {
+    const data = await getForecast(city);
+    print(data);
+  } catch (e) {
+    print(`Error: ${e.message}`);
+  }
+});
+
+$("#btnExport").addEventListener("click", async () => {
+  try {
+    const res = await fetch("/logs.csv", { cache: "no-store" });
+    if (!res.ok) throw new Error(`CSV HTTP ${res.status}`);
+    const blob = await res.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "lluvias_asuncion.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } catch (e) {
+    print("Error generando CSV");
+    console.error(e);
+  }
 });

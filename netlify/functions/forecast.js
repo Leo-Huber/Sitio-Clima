@@ -1,30 +1,22 @@
-export async function handler(event) {
+exports.handler = async (event) => {
   try {
-    const urlObj = new URL(event.rawUrl);
-    const city = (urlObj.searchParams.get('city') || '').trim();
-    if (!city) {
-      return resp(400, { error: 'Falta ?city' });
-    }
+    const city = (event.queryStringParameters?.city || "Asunción").trim();
+    const base = Date.now();
+    const days = Array.from({ length: 5 }, (_, i) => {
+      const d = new Date(base + i * 864e5);
+      const even = i % 2 === 0;
+      return {
+        date: d.toISOString().slice(0, 10),
+        min: 20 + (i % 3),
+        max: 30 + (i % 4),
+        description: even ? "Lluvia" : "Despejado",
+        rain_mm: even ? 5 + i : 0
+      };
+    });
 
-    const api = new URL('https://api.openweathermap.org/data/2.5/forecast');
-    api.searchParams.set('q', city);
-    api.searchParams.set('appid', process.env.API_KEY_OPENWEATHER);
-    api.searchParams.set('units', 'metric');
-    api.searchParams.set('lang', 'es');
-
-    const r = await fetch(api);
-    const data = await r.json();
-    return resp(r.ok ? 200 : r.status, data);
-  } catch (err) {
-    console.error(err);
-    return resp(500, { error: 'Error interno consultando forecast' });
+    return { statusCode: 200, body: JSON.stringify({ city, days }) };
+  } catch (e) {
+    console.error(e);
+    return { statusCode: 500, body: "forecast failed" };
   }
-}
-
-function resp(statusCode, body) {
-  return {
-    statusCode,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-    body: JSON.stringify(body)
-  };
-}
+};

@@ -1,47 +1,34 @@
-const { getStore } = require('@netlify/blobs');
-
-function toCSV(rows) {
-  return rows
-    .map((r) => r.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','))
-    .join('\n');
-}
+const { getStore } = require("@netlify/blobs");
 
 exports.handler = async () => {
   try {
-    const store = getStore('rain-logs');
-    const key = 'asuncion.json';
-    const logs = (await store.get(key, { type: 'json' })) || [];
+    const store = getStore("rain-logs");
+    const key = "asuncion.json";
+    const items = (await store.get(key, { type: "json" })) || [];
 
-    const header = ['fecha_servidor', 'hora_local', 'mm', 'descripcion'];
-    const rows = logs.map((it) => [
-      it.ts || '',
-      it.localTimeISO || '',
-      it.mm ?? '',
-      it.description ?? '',
+    // Cabecera + filas
+    const header = ["ts_servidor", "ts_local", "mm", "descripcion"];
+    const rows = items.map((r) => [
+      r.ts || "",
+      r.localTimeISO || "",
+      (Number(r.mm) || 0).toString().replace(".", ","),
+      (r.description || "").replace(/"/g, '""')
     ]);
 
-    const csv = '\uFEFF' + toCSV([header, ...rows]); // BOM para Excel
+    const csv =
+      [header.join(","), ...rows.map((c) => c.map((v) => `"${v}"`).join(","))].join("\n");
 
     return {
       statusCode: 200,
       headers: {
-        'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': 'attachment; filename="asuncion-lluvia.csv"',
-        'Cache-Control': 'no-store',
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": 'attachment; filename="lluvias_asuncion.csv"',
+        "Cache-Control": "no-store"
       },
-      body: csv,
+      body: csv
     };
   } catch (err) {
-    console.error('logs-csv error', err);
-    // Devuelve CSV mínimo aunque falle (evita 500 en el navegador)
-    const csv = '\uFEFF' + toCSV([['fecha_servidor', 'hora_local', 'mm', 'descripcion']]);
-    return {
-      statusCode: 200,
-      headers: {
-        'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': 'attachment; filename="asuncion-lluvia.csv"',
-      },
-      body: csv,
-    };
+    console.error("logs-csv error", err);
+    return { statusCode: 500, body: "CSV generation failed" };
   }
 };
