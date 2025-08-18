@@ -2,7 +2,7 @@
   publish = "."
   functions = "netlify/functions"
 
-# --- APIs del front ---
+# Endpoints existentes del clima
 [[redirects]]
   from = "/api/weather"
   to   = "/.netlify/functions/weather"
@@ -13,14 +13,14 @@
   to   = "/.netlify/functions/forecast"
   status = 200
 
+# Logs de lluvia (Asunción 07–17)
 [[redirects]]
   from = "/api/log-rain"
-  to   = "/.netlify/functions/log-rain"
+  to   = "/.netlify/functions/logRain"
   status = 200
 
-# Descarga directa de CSV
+# Exportación CSV
 [[redirects]]
-  from = "/logs.csv"
-  to   = "/.netlify/functions/logs-csv"
+  from = "/api/logs-csv"
+  to   = "/.netlify/functions/logsCsv"
   status = 200
-  force = true

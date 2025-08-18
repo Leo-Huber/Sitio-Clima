@@ -10,7 +10,7 @@
 </head>
 <body>
   <header class="topbar">
-    <h1 class="brand">Mi Clima</h1>
+    <h1 class="brand"><span>Mi</span><span>Clima</span></h1>
     <form id="buscador" class="search" autocomplete="off">
       <input id="ciudadEntrada" type="text" placeholder="Buscar ciudad (ej: Asunción)"/>
       <button id="botonBusqueda" type="submit">Buscar</button>
@@ -28,23 +28,22 @@
 
       <span class="spacer"></span>
 
-      <!-- Acciones de logging/export -->
       <button id="btnLogAsu" class="pill" title="Registrar lluvia en Asunción (07–17)">Registrar lluvia</button>
       <button id="btnExportCSV" class="pill pill-accent" title="Descargar logs CSV">Exportar CSV</button>
     </section>
 
     <section id="panelActual" class="card current" aria-live="polite">
-      <div id="datosClima" class="current__content"><!-- renderActual() --></div>
+      <div id="datosClima" class="current__content"></div>
     </section>
 
     <section class="card hourly">
-      <h2>Por hora (próximas 24 h)</h2>
-      <div id="listaHoraria" class="hourly__list" role="list"><!-- renderHoraria() --></div>
+      <h2>Por hora (próximas 24 h)</h2>
+      <div id="listaHoraria" class="hourly__list" role="list"></div>
     </section>
 
     <section class="card daily">
       <h2>Próximos días</h2>
-      <div id="listaDiaria" class="daily__grid" role="list"><!-- renderDiaria() --></div>
+      <div id="listaDiaria" class="daily__grid" role="list"></div>
     </section>
 
     <p id="estado" class="status" aria-live="polite"></p>

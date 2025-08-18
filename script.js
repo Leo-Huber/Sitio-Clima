@@ -1,25 +1,24 @@
-// --- Utilidades ---
+// Helpers
 const $ = (sel) => document.querySelector(sel);
 const estado = $('#estado');
 
-function iconUrl(code){ return `https://openweathermap.org/img/wn/${code}@2x.png`; }
-function fmtTemp(v){ return `${Math.round(v)}°C`; }
-function fmtWind(ms){ return `${Math.round(ms*3.6)} km/h`; }
-function titleCase(s){ return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+const iconUrl = (code) => `https://openweathermap.org/img/wn/${code}@2x.png`;
+const fmtTemp = (v) => `${Math.round(v)}°C`;
+const fmtWind = (ms) => `${Math.round(ms*3.6)} km/h`;
+const titleCase = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '');
 
-function toLocal(dt, tzSeconds){ return new Date((dt + tzSeconds) * 1000); }
-function dayKey(date){
+const toLocal = (dt, tzSeconds) => new Date((dt + tzSeconds) * 1000);
+const dayKey = (date) => {
   const y = date.getUTCFullYear();
   const m = String(date.getUTCMonth()+1).padStart(2,'0');
   const d = String(date.getUTCDate()).padStart(2,'0');
   return `${y}-${m}-${d}`;
-}
-function dayName(date){ return date.toLocaleDateString('es-ES', { weekday:'short' }).replace('.',''); }
-function hourStr(date){ return date.toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' }); }
+};
+const dayName = (date) => date.toLocaleDateString('es-ES', { weekday:'short' }).replace('.','');
+const hourStr = (date) => date.toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' });
 
-// --- Render: clima actual ---
+// Render actual
 function renderActual(data){
-  // Soporta respuesta OpenWeather (completa) o payload simple {city,temp,description,rain_mm}
   if (data?.main && data?.weather) {
     const { name, sys, main, weather, wind } = data;
     const w = weather[0];
@@ -49,18 +48,18 @@ function renderActual(data){
         <p class="meta">${desc}</p>
         <div class="temp">${temp}</div>
       </div>
-      <div class="right"> </div>`;
+      <div class="right"></div>`;
     $('#datosClima').innerHTML = html;
   }
 }
 
-// --- Render: por hora (24h) usando OpenWeather forecast ---
+// Render por hora (24h)
 function renderHoraria(list){
   if (!Array.isArray(list) || !list.length) { $('#listaHoraria').innerHTML = ''; return; }
   const now = Date.now();
-  const prox = list.filter(i => (i.dt*1000) > now).slice(0, 8); // 8 * 3h = 24h
+  const prox = list.filter(i => (i.dt*1000) > now).slice(0, 8);
   $('#listaHoraria').innerHTML = prox.map(i => {
-    const date = new Date(i.dt * 1000); // hora local del usuario
+    const date = new Date(i.dt * 1000);
     return `
       <div class="hour">
         <div class="time">${hourStr(date)}</div>
@@ -71,7 +70,7 @@ function renderHoraria(list){
   }).join('');
 }
 
-// --- Render: próximos días (mín/máx por día) ---
+// Render próximos días
 function renderDiaria(list, cityTZ){
   if (!Array.isArray(list) || !list.length) { $('#listaDiaria').innerHTML = ''; return; }
   const grupos = new Map();
@@ -106,7 +105,7 @@ function renderDiaria(list, cityTZ){
   `).join('');
 }
 
-// --- Búsqueda principal (usa backend serverless) ---
+// Buscar ciudad (clima + forecast) y log opcional Asunción
 async function buscarCiudad(ciudad){
   if(!ciudad) return;
   estado.textContent = 'Buscando…';
@@ -116,7 +115,6 @@ async function buscarCiudad(ciudad){
       fetch(`/api/forecast?city=${encodeURIComponent(ciudad)}`)
     ]);
 
-    // Soportar payload simple (200/JSON) o error con message
     if(!wResp.ok){
       const err = await wResp.json().catch(()=> ({}));
       throw new Error(err.message || `Error clima actual (${wResp.status})`);
@@ -130,10 +128,10 @@ async function buscarCiudad(ciudad){
     const fData = await fResp.json();
 
     renderActual(wData);
-    renderHoraria(fData.list || []);                   // si tu forecast es mock, puede no traer list
+    renderHoraria(fData.list || []);
     renderDiaria(fData.list || [], fData.city?.timezone || 0);
 
-    // Registrar lluvia automática solo para Asunción (07–17 se valida del lado server)
+    // Registrar lluvia automática si es Asunción
     const isAsu = (ciudad || '').normalize('NFD').replace(/\p{Diacritic}/gu,'').toLowerCase() === 'asuncion';
     const looksRain = Boolean((wData?.rain?.['1h'] || wData?.rain?.['3h'] || 0) > 0 ||
                        /lluvia|rain|shower|tormenta|drizzle/i.test(wData?.description || wData?.weather?.[0]?.description || ''));
@@ -145,7 +143,7 @@ async function buscarCiudad(ciudad){
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ city: 'Asunción', localTimeISO, mm, description })
-      }).catch(()=>{ /* silencioso */ });
+      }).catch(()=>{});
     }
 
     estado.textContent = `Actualizado: ${new Date().toLocaleTimeString('es-ES')}`;
@@ -155,34 +153,35 @@ async function buscarCiudad(ciudad){
   }
 }
 
-// --- Eventos UI ---
+// Eventos UI
 document.addEventListener('DOMContentLoaded', () => {
-  // Quick cities
   document.querySelectorAll('.pill[data-city]').forEach(btn => {
     btn.addEventListener('click', () => buscarCiudad(btn.dataset.city));
   });
 
-  // Form submit + Enter
   $('#buscador').addEventListener('submit', (e) => {
     e.preventDefault();
     const v = $('#ciudadEntrada').value.trim();
     buscarCiudad(v);
   });
 
-  // Acciones: log y export
+  // Registrar lluvia manual (Asunción)
   const btnLog = $('#btnLogAsu');
   if (btnLog) {
     btnLog.addEventListener('click', async () => {
       btnLog.disabled = true;
       try{
-        const r = await fetch('/api/log-rain?city=' + encodeURIComponent('Asunción'), { method: 'POST', body: JSON.stringify({ city: 'Asunción', localTimeISO: new Date().toISOString(), mm: 0, description:'manual' })});
+        const localTimeISO = new Date().toISOString();
+        const r = await fetch('/api/log-rain', { method: 'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ city: 'Asunción', localTimeISO, mm: 0, description:'manual' })});
         const j = await r.json().catch(()=> ({}));
-        alert(j.ok ? `Registro actualizado (agregados: ${j.added || j.count || 0})` : (j.message || 'Listo'));
+        alert(j.ok ? `Registro actualizado (total: ${j.count || 0})` : 'Listo');
       }catch(e){ alert('Error registrando lluvia'); }
       btnLog.disabled = false;
     });
   }
 
+  // Exportar CSV
   const btnCsv = $('#btnExportCSV');
   if (btnCsv) {
     btnCsv.addEventListener('click', async () => {
