@@ -139,7 +139,7 @@ async function buscarCiudad(ciudad){
       const localTimeISO = new Date().toISOString();
       const mm = wData?.rain?.['1h'] || wData?.rain?.['3h'] || 0;
       const description = wData?.description || wData?.weather?.[0]?.description || 'lluvia';
-      fetch('/api/log-rain', {
+      fetch('/api/logRain', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ city: 'Asunción', localTimeISO, mm, description })
@@ -172,7 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
       btnLog.disabled = true;
       try{
         const localTimeISO = new Date().toISOString();
-        const r = await fetch('/api/log-rain', { method: 'POST', headers:{'Content-Type':'application/json'},
+        const r = await fetch('/api/logRain', { method: 'POST', headers:{'Content-Type':'application/json'},
           body: JSON.stringify({ city: 'Asunción', localTimeISO, mm: 0, description:'manual' })});
         const j = await r.json().catch(()=> ({}));
         alert(j.ok ? `Registro actualizado (total: ${j.count || 0})` : 'Listo');
@@ -186,7 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnCsv) {
     btnCsv.addEventListener('click', async () => {
       try {
-        const res = await fetch('/api/logs-csv', { cache:'no-store' });
+        const res = await fetch('/api/logsCsv', { cache:'no-store' });
         if(!res.ok) throw new Error(`CSV HTTP ${res.status}`);
         const blob = await res.blob();
         const a = document.createElement('a');
