@@ -1,22 +1,19 @@
+const fetch = global.fetch;
+
 exports.handler = async (event) => {
   try {
-    const city = (event.queryStringParameters?.city || "Asunción").trim();
-    const base = Date.now();
-    const days = Array.from({ length: 5 }, (_, i) => {
-      const d = new Date(base + i * 864e5);
-      const even = i % 2 === 0;
-      return {
-        date: d.toISOString().slice(0, 10),
-        min: 20 + (i % 3),
-        max: 30 + (i % 4),
-        description: even ? "Lluvia" : "Despejado",
-        rain_mm: even ? 5 + i : 0
-      };
-    });
+    const city = (event.queryStringParameters?.city || 'Asunción').trim();
+    const url = new URL('https://api.openweathermap.org/data/2.5/forecast');
+    url.searchParams.set('q', city);
+    url.searchParams.set('appid', process.env.API_KEY_OPENWEATHER);
+    url.searchParams.set('units', 'metric');
+    url.searchParams.set('lang', 'es');
 
-    return { statusCode: 200, body: JSON.stringify({ city, days }) };
+    const r = await fetch(url);
+    const data = await r.json(); // debe contener { list: [...], city: { timezone, ... } }
+    return { statusCode: r.ok ? 200 : r.status, body: JSON.stringify(data) };
   } catch (e) {
-    console.error(e);
-    return { statusCode: 500, body: "forecast failed" };
+    console.error('forecast error', e);
+    return { statusCode: 500, body: JSON.stringify({ message: 'Error pronóstico' }) };
   }
 };
