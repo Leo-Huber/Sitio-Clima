@@ -2,7 +2,6 @@
   publish = "."
   functions = "netlify/functions"
 
-# Rutas principales (con guiones)
 [[redirects]]
   from = "/api/weather"
   to   = "/.netlify/functions/weather"
@@ -13,17 +12,6 @@
   to   = "/.netlify/functions/forecast"
   status = 200
 
-[[redirects]]
-  from = "/api/log-rain"
-  to   = "/.netlify/functions/logRain"
-  status = 200
-
-[[redirects]]
-  from = "/api/logs-csv"
-  to   = "/.netlify/functions/logsCsv"
-  status = 200
-
-# Rutas extra para compatibilidad con camelCase usados por el front
 [[redirects]]
   from = "/api/logRain"
   to   = "/.netlify/functions/logRain"

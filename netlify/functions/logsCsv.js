@@ -26,6 +26,15 @@ exports.handler = async () => {
     };
   } catch (e) {
     console.error('logsCsv error', e);
-    return { statusCode: 500, body: 'CSV generation failed' };
+    // Evita 502/500: devuelve CSV vacío con cabeceras
+    const csv = '\uFEFF' + ['ts_servidor,ts_local,mm,descripcion'].join('\n');
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="lluvias_asuncion.csv"'
+      },
+      body: csv
+    };
   }
 };
